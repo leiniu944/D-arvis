@@ -14,14 +14,15 @@ class AICore(QOpenGLWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_AlwaysStackOnTop)
 
-        self.rotation = 0.0
-        self.rotation_2 = 0.0
-        self.pulse = 0.0
         self.time = 0.0
-
-        self.outer_particles = []
-        self.energy_particles = []
-
+        self.rotation = 0.0
+        self.rotation_y = 0.0
+        self.activity = 0.0
+        self.pulse = 0.0
+        self.pulse_strength = 0.0
+        self.particles = []
+        self.flow_particles = []
+        self.orbit_particles = []
         self.create_particles()
 
         self.timer = QTimer(self)
@@ -29,287 +30,237 @@ class AICore(QOpenGLWidget):
         self.timer.start(16)
 
     def create_particles(self):
-        self.outer_particles.clear()
-        self.energy_particles.clear()
+        self.particles.clear()
+        self.flow_particles.clear()
+        self.orbit_particles.clear()
 
-        # Delikatne cząsteczki otaczające czarną dziurę
-        for _ in range(520):
-            angle = random.uniform(0.0, math.pi * 2.0)
-            radius = random.uniform(3.0, 6.5)
-            height = random.uniform(-2.5, 2.5)
+        golden_angle = math.pi * (3.0 - math.sqrt(5.0))
 
-            x = math.cos(angle) * radius
-            y = math.sin(angle) * radius
-            z = height
+        # Gęsta, organiczna sfera
+        for i in range(2400):
+            y = 1.0 - (i / 2399.0) * 2.0
+            r = math.sqrt(max(0.0, 1.0 - y * y))
+            theta = golden_angle * i
 
-            size = random.choice([1.0, 1.4, 1.8, 2.4])
+            radius = 3.0 + random.uniform(-0.035, 0.035)
+            x = math.cos(theta) * r * radius
+            y *= radius
+            z = math.sin(theta) * r * radius
 
-            self.outer_particles.append({
+            self.particles.append({
                 "x": x,
                 "y": y,
                 "z": z,
-                "angle": angle,
-                "radius": radius,
-                "height": height,
-                "speed": random.uniform(0.0005, 0.002),
-                "size": size,
-                "phase": random.uniform(0.0, math.pi * 2.0)
+                "phase": random.uniform(0.0, math.tau),
+                "speed": random.uniform(0.35, 1.25),
+                "size": random.choice([0.7, 0.9, 1.1, 1.3, 1.6, 2.0]),
+                "brightness": random.uniform(0.25, 1.0)
             })
 
-        # Cząsteczki wirujące wokół horyzontu
-        for _ in range(240):
-            angle = random.uniform(0.0, math.pi * 2.0)
-            radius = random.uniform(1.65, 3.4)
+        # Strumienie przemieszczające się po powierzchni
+        for _ in range(900):
+            self.flow_particles.append({
+                "lat": random.uniform(-1.25, 1.25),
+                "lon": random.uniform(0.0, math.tau),
+                "speed": random.uniform(0.25, 1.0),
+                "phase": random.uniform(0.0, math.tau),
+                "size": random.choice([0.8, 1.0, 1.2, 1.5, 2.0, 2.6]),
+                "brightness": random.uniform(0.5, 1.0)
+            })
 
-            self.energy_particles.append({
-                "angle": angle,
-                "radius": radius,
-                "z": random.uniform(-0.22, 0.22),
-                "speed": random.uniform(0.004, 0.012),
-                "size": random.choice([1.0, 1.5, 2.0, 2.8]),
-                "phase": random.uniform(0.0, math.pi * 2.0)
+        # Luźne cząsteczki poza sferą
+        for _ in range(260):
+            self.orbit_particles.append({
+                "angle": random.uniform(0.0, math.tau),
+                "radius": random.uniform(3.15, 4.25),
+                "height": random.uniform(-0.7, 0.7),
+                "speed": random.uniform(0.05, 0.20),
+                "phase": random.uniform(0.0, math.tau),
+                "size": random.choice([0.8, 1.0, 1.3, 1.7, 2.2])
             })
 
     def initializeGL(self):
         glClearColor(0.0, 0.0, 0.0, 0.0)
-
         glEnable(GL_DEPTH_TEST)
         glDepthFunc(GL_LEQUAL)
-
         glEnable(GL_BLEND)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE)
         glEnable(GL_POINT_SMOOTH)
         glEnable(GL_LINE_SMOOTH)
-
         glHint(GL_POINT_SMOOTH_HINT, GL_NICEST)
         glHint(GL_LINE_SMOOTH_HINT, GL_NICEST)
 
-        glEnable(GL_CULL_FACE)
-        glCullFace(GL_BACK)
-
     def resizeGL(self, width, height):
-        if height == 0:
-            height = 1
-
+        height = max(1, height)
         glViewport(0, 0, width, height)
-
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
-
-        gluPerspective(
-            45.0,
-            width / float(height),
-            0.1,
-            100.0
-        )
-
+        gluPerspective(43.0, width / float(height), 0.1, 100.0)
         glMatrixMode(GL_MODELVIEW)
 
     def animate(self):
         self.time += 0.016
+        self.rotation += 0.16
+        self.rotation_y += 0.07
 
-        self.rotation += 0.35
-        self.rotation_2 += 0.17
+        # Autonomiczna aktywność - Core nigdy nie jest całkowicie statyczny.
+        self.activity = (
+            0.22
+            + 0.12 * math.sin(self.time * 0.37)
+            + 0.07 * math.sin(self.time * 0.91)
+        )
 
-        self.pulse += 0.045
+        # Okresowe, naturalne impulsy energii.
+        pulse_cycle = self.time % 9.0
+        if pulse_cycle < 0.55:
+            self.pulse_strength = math.sin(
+                (pulse_cycle / 0.55) * math.pi
+            )
+        else:
+            self.pulse_strength *= 0.91
 
-        if self.pulse > math.pi * 2:
-            self.pulse -= math.pi * 2
+        for p in self.flow_particles:
+            p["lon"] += 0.0045 * p["speed"] * (1.0 + self.activity * 1.8)
 
-        # Obrót cząsteczek
-        for particle in self.outer_particles:
-            particle["angle"] += particle["speed"]
-
-        for particle in self.energy_particles:
-            particle["angle"] += particle["speed"]
+        for p in self.orbit_particles:
+            p["angle"] += 0.0015 * p["speed"] * (1.0 + self.activity)
 
         self.update()
 
     def paintGL(self):
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-
         glMatrixMode(GL_MODELVIEW)
         glLoadIdentity()
+        glTranslatef(0.0, 0.0, -9.0)
 
-        # Odsunięcie kamery
-        glTranslatef(0.0, 0.0, -8.5)
+        # Bardzo wolne "oddychanie" całej sfery.
+        glRotatef(math.sin(self.time * 0.18) * 5.0, 1.0, 0.0, 0.0)
+        glRotatef(self.rotation, 0.0, 1.0, 0.0)
+        glRotatef(math.sin(self.time * 0.11) * 3.0, 0.0, 0.0, 1.0)
 
-        # Lekka perspektywiczna rotacja całego obiektu
-        glRotatef(math.sin(self.time * 0.25) * 4.0, 1.0, 0.0, 0.0)
-        glRotatef(math.cos(self.time * 0.20) * 5.0, 0.0, 1.0, 0.0)
+        self.draw_aura()
+        self.draw_orbit_particles()
+        self.draw_sphere()
+        self.draw_flow()
+        self.draw_ribbons()
+        self.draw_energy_pulse()
+        self.draw_center()
 
-        self.draw_outer_particles()
-        self.draw_accretion_disk()
-        self.draw_energy_particles()
-        self.draw_black_hole()
-        self.draw_inner_ring()
+    def draw_aura(self):
+        # Miękka poświata budowana z punktów, dzięki czemu nie ma ostrej krawędzi.
+        for size, alpha in [
+            (170.0, 0.012),
+            (125.0, 0.016),
+            (85.0, 0.020),
+            (50.0, 0.028),
+        ]:
+            glPointSize(size)
+            glBegin(GL_POINTS)
+            glColor4f(0.03, 0.42, 1.0, alpha)
+            glVertex3f(0.0, 0.0, 0.0)
+            glEnd()
 
-    def draw_outer_particles(self):
-        groups = {
-            1.0: [],
-            1.4: [],
-            1.8: [],
-            2.4: []
-        }
+    def draw_sphere(self):
+        groups = {0.7: [], 0.9: [], 1.1: [], 1.3: [], 1.6: [], 2.0: []}
 
-        for p in self.outer_particles:
-            x = p["x"]
-            y = p["y"]
-            z = p["z"]
+        for p in self.particles:
+            phase = p["phase"]
+            wave = math.sin(self.time * 0.9 * p["speed"] + phase)
+            scale = 1.0 + wave * 0.018 + self.pulse_strength * 0.025
 
-            angle = p["angle"]
+            x = p["x"] * scale
+            y = p["y"] * scale
+            z = p["z"] * scale
 
-            radius = p["radius"]
+            # Subtelne lokalne przesuwanie cząsteczek.
+            x += math.sin(self.time * 0.45 + phase) * 0.018
+            y += math.cos(self.time * 0.52 + phase) * 0.018
+            z += math.sin(self.time * 0.62 + phase) * 0.018
 
-            # Powolny obrót przestrzeni
-            ca = math.cos(angle)
-            sa = math.sin(angle)
-
-            px = ca * radius
-            py = sa * radius
-            pz = z + math.sin(self.time * 0.6 + p["phase"]) * 0.08
-
-            groups[p["size"]].append((px, py, pz, p["phase"]))
+            groups[p["size"]].append(
+                (x, y, z, phase, p["brightness"])
+            )
 
         for size, points in groups.items():
             glPointSize(size)
-
             glBegin(GL_POINTS)
 
-            for x, y, z, phase in points:
-                brightness = 0.18 + (
-                    0.18 * (math.sin(self.time * 2.0 + phase) + 1.0)
-                )
+            for x, y, z, phase, brightness in points:
+                shimmer = (
+                    math.sin(self.time * 2.8 + phase) + 1.0
+                ) * 0.5
+                alpha = 0.08 + brightness * 0.25 + shimmer * 0.20
+                alpha += self.pulse_strength * 0.12
 
                 glColor4f(
-                    0.15,
-                    0.65,
+                    0.04,
+                    0.45 + shimmer * 0.25,
                     1.0,
-                    brightness
+                    min(alpha, 0.82)
                 )
-
                 glVertex3f(x, y, z)
 
             glEnd()
 
-    def draw_accretion_disk(self):
-        # Główna świecąca warstwa dysku
-        layers = [
-            (2.05, 0.055, 0.65),
-            (2.25, 0.045, 0.48),
-            (2.50, 0.035, 0.32),
-            (2.80, 0.025, 0.20),
-            (3.15, 0.018, 0.10)
-        ]
+    def draw_flow(self):
+        groups = {0.8: [], 1.0: [], 1.2: [], 1.5: [], 2.0: [], 2.6: []}
 
-        for radius, thickness, alpha in layers:
-            glLineWidth(2.0)
+        for p in self.flow_particles:
+            lat = p["lat"]
+            lon = p["lon"]
 
-            glBegin(GL_LINE_LOOP)
+            # Ruch o zmiennej prędkości tworzy wrażenie "rzek" energii.
+            lat += math.sin(
+                lon * 2.5 + self.time * 0.7 + p["phase"]
+            ) * 0.035
 
-            segments = 180
+            radius = 3.035 + math.sin(
+                lon * 5.0 - self.time * 1.8 + p["phase"]
+            ) * 0.075
 
-            for i in range(segments):
-                angle = (i / segments) * math.pi * 2.0
+            cos_lat = math.cos(lat)
+            x = math.cos(lon) * cos_lat * radius
+            y = math.sin(lat) * radius
+            z = math.sin(lon) * cos_lat * radius
 
-                # Delikatne deformacje dysku
-                wave = math.sin(
-                    angle * 5.0 +
-                    self.time * 1.5
-                ) * thickness
-
-                r = radius + wave
-
-                x = math.cos(angle) * r
-                y = math.sin(angle) * r
-
-                z = math.sin(angle * 3.0 + self.time) * 0.035
-
-                intensity = 0.55 + (
-                    0.45 * math.sin(
-                        angle * 2.0 -
-                        self.time * 2.0
-                    )
-                )
-
-                intensity = max(0.1, intensity)
-
-                glColor4f(
-                    0.12,
-                    0.65 + intensity * 0.25,
-                    1.0,
-                    alpha
-                )
-
-                glVertex3f(x, y, z)
-
-            glEnd()
-
-        # Grubszy, bardzo jasny pierścień
-        glLineWidth(3.0)
-
-        glBegin(GL_LINE_LOOP)
-
-        for i in range(240):
-            angle = (i / 240.0) * math.pi * 2.0
-
-            radius = 1.88
-
-            deformation = math.sin(
-                angle * 8.0 +
-                self.time * 3.0
-            ) * 0.025
-
-            radius += deformation
-
-            x = math.cos(angle) * radius
-            y = math.sin(angle) * radius
-
-            pulse = (
-                math.sin(self.time * 3.0) + 1.0
-            ) * 0.5
-
-            alpha = 0.55 + pulse * 0.35
-
-            glColor4f(
-                0.25,
-                0.82,
-                1.0,
-                alpha
+            groups[p["size"]].append(
+                (x, y, z, p["phase"], p["brightness"])
             )
 
-            glVertex3f(x, y, 0.0)
+        for size, points in groups.items():
+            glPointSize(size)
+            glBegin(GL_POINTS)
 
-        glEnd()
+            for x, y, z, phase, brightness in points:
+                pulse = (
+                    math.sin(self.time * 4.5 + phase) + 1.0
+                ) * 0.5
 
-    def draw_energy_particles(self):
-        groups = {
-            1.0: [],
-            1.5: [],
-            2.0: [],
-            2.8: []
-        }
+                alpha = 0.14 + brightness * 0.34 + pulse * 0.34
+                alpha += self.pulse_strength * 0.20
 
-        for p in self.energy_particles:
+                glColor4f(
+                    0.08,
+                    0.58 + pulse * 0.18,
+                    1.0,
+                    min(alpha, 1.0)
+                )
+                glVertex3f(x, y, z)
+
+            glEnd()
+
+    def draw_orbit_particles(self):
+        groups = {0.8: [], 1.0: [], 1.3: [], 1.7: [], 2.2: []}
+
+        for p in self.orbit_particles:
             angle = p["angle"]
             radius = p["radius"]
 
-            # Spiralny ruch w kierunku czarnej dziury
-            spiral_radius = radius
-
-            x = math.cos(angle) * spiral_radius
-            y = math.sin(angle) * spiral_radius
-
-            # Delikatna wysokość dysku
-            z = (
-                p["z"] +
-                math.sin(
-                    angle * 3.0 +
-                    self.time * 2.0 +
-                    p["phase"]
-                ) * 0.06
-            )
+            x = math.cos(angle) * radius
+            z = math.sin(angle) * radius
+            y = p["height"] + math.sin(
+                self.time * 0.8 + p["phase"]
+            ) * 0.12
 
             groups[p["size"]].append(
                 (x, y, z, p["phase"])
@@ -317,158 +268,134 @@ class AICore(QOpenGLWidget):
 
         for size, points in groups.items():
             glPointSize(size)
-
             glBegin(GL_POINTS)
 
             for x, y, z, phase in points:
-                pulse = (
-                    math.sin(
-                        self.time * 5.0 +
-                        phase
-                    ) + 1.0
+                brightness = (
+                    math.sin(self.time * 2.0 + phase) + 1.0
                 ) * 0.5
 
-                alpha = 0.30 + pulse * 0.55
-
                 glColor4f(
-                    0.25,
-                    0.75,
+                    0.05,
+                    0.45 + brightness * 0.20,
                     1.0,
-                    alpha
+                    0.10 + brightness * 0.30
                 )
-
                 glVertex3f(x, y, z)
 
             glEnd()
 
-    def draw_black_hole(self):
-        # Zewnętrzna poświata
-        glow_layers = [
-            (1.75, 0.04),
-            (1.55, 0.055),
-            (1.35, 0.07),
-            (1.18, 0.09)
-        ]
+    def draw_ribbons(self):
+        # Długie, prawie niewidoczne strumienie oplatające kulę.
+        for stream in range(18):
+            phase = stream / 18.0 * math.tau
+            glLineWidth(1.0)
+            glBegin(GL_LINE_STRIP)
 
-        for radius, alpha in glow_layers:
-            glColor4f(
-                0.08,
-                0.55,
-                1.0,
-                alpha
-            )
+            for i in range(120):
+                t = i / 119.0
+                lon = (
+                    phase
+                    + t * math.tau
+                    + self.time * (0.20 + stream * 0.002)
+                )
 
-            self.draw_filled_circle(
-                radius,
-                96
-            )
+                lat = math.sin(
+                    t * math.tau * 1.35
+                    + phase
+                    + self.time * 0.45
+                ) * 0.72
 
-        # Sama czarna dziura
-        glColor4f(
-            0.002,
-            0.004,
-            0.008,
-            1.0
-        )
+                radius = 3.045 + math.sin(
+                    t * math.tau * 7.0
+                    + self.time * 2.0
+                    + phase
+                ) * 0.045
 
-        self.draw_filled_circle(
-            1.08,
-            128
-        )
+                cos_lat = math.cos(lat)
+                x = math.cos(lon) * cos_lat * radius
+                y = math.sin(lat) * radius
+                z = math.sin(lon) * cos_lat * radius
 
-        # Delikatny niebieski horyzont
-        glLineWidth(2.0)
+                edge = math.sin(t * math.pi)
+                flow = (
+                    math.sin(
+                        t * math.tau * 3.0
+                        - self.time * 3.0
+                        + phase
+                    ) + 1.0
+                ) * 0.5
 
-        glBegin(GL_LINE_LOOP)
+                alpha = 0.012 + edge * 0.075 + flow * 0.035
+                alpha += self.pulse_strength * 0.055
+
+                glColor4f(
+                    0.03,
+                    0.50,
+                    1.0,
+                    alpha
+                )
+                glVertex3f(x, y, z)
+
+            glEnd()
+
+    def draw_energy_pulse(self):
+        if self.pulse_strength <= 0.01:
+            return
+
+        radius = 3.0 + self.pulse_strength * 0.9
+        glPointSize(2.0 + self.pulse_strength * 3.0)
+        glBegin(GL_POINTS)
 
         for i in range(180):
-            angle = (i / 180.0) * math.pi * 2.0
+            angle = i / 180.0 * math.tau
+            lat = math.sin(angle * 3.0 + self.time) * 0.55
+            cos_lat = math.cos(lat)
 
-            radius = 1.08
-
-            x = math.cos(angle) * radius
-            y = math.sin(angle) * radius
+            x = math.cos(angle) * cos_lat * radius
+            y = math.sin(lat) * radius
+            z = math.sin(angle) * cos_lat * radius
 
             glColor4f(
-                0.15,
+                0.10,
                 0.70,
                 1.0,
-                0.40
+                self.pulse_strength * 0.22
             )
-
-            glVertex3f(
-                x,
-                y,
-                0.015
-            )
+            glVertex3f(x, y, z)
 
         glEnd()
 
-    def draw_inner_ring(self):
-        # Jasny pierścień znajdujący się "przed" czarną dziurą
-        pulse = (
-            math.sin(self.time * 3.0) + 1.0
-        ) * 0.5
-
-        glLineWidth(2.5)
-
-        glBegin(GL_LINE_LOOP)
-
-        for i in range(240):
-            angle = (i / 240.0) * math.pi * 2.0
-
-            radius = 1.30 + (
-                math.sin(
-                    angle * 6.0 +
-                    self.time * 2.0
-                ) * 0.018
-            )
-
-            x = math.cos(angle) * radius
-            y = math.sin(angle) * radius
-
-            alpha = 0.45 + pulse * 0.35
-
-            glColor4f(
-                0.20,
-                0.75,
-                1.0,
-                alpha
-            )
-
-            glVertex3f(
-                x,
-                y,
-                0.04
-            )
-
-        glEnd()
-
-    def draw_filled_circle(self, radius, segments):
-        glBegin(GL_TRIANGLE_FAN)
-
-        glVertex3f(
-            0.0,
-            0.0,
-            0.0
+    def draw_center(self):
+        # Bardzo subtelne źródło światła wewnątrz sfery.
+        intensity = (
+            0.035
+            + self.pulse_strength * 0.10
+            + self.activity * 0.025
         )
 
-        for i in range(segments + 1):
-            angle = (
-                i / segments
-            ) * math.pi * 2.0
-
-            x = math.cos(angle) * radius
-            y = math.sin(angle) * radius
-
-            glVertex3f(
-                x,
-                y,
-                0.0
+        for size, multiplier in [
+            (45.0, 0.25),
+            (24.0, 0.45),
+            (10.0, 1.0),
+        ]:
+            glPointSize(size)
+            glBegin(GL_POINTS)
+            glColor4f(
+                0.05,
+                0.55,
+                1.0,
+                intensity * multiplier
             )
+            glVertex3f(0.0, 0.0, 0.0)
+            glEnd()
 
-        glEnd()
+    def set_activity(self, value):
+        self.activity = max(0.0, min(1.0, float(value)))
 
     def cleanup(self):
+        if self.timer.isActive():
+            self.timer.stop()
+
         self.makeCurrent()
         self.doneCurrent()
