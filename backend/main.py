@@ -237,7 +237,7 @@ class JarvisDisplay(QWidget):
         # STATUS LEWY DÓŁ
         # =========================
 
-        self.status_left = QLabel("SYSTEM ONLINE", self.content_area)
+        self.status_left = QLabel("SYSTEMs ONLINE", self.content_area)
 
         self.status_left.setFont(QFont("Consolas", 9))
 
