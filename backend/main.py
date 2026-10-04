@@ -27,6 +27,7 @@ from system_panel import SystemPanel
 from files_panel import FilesPanel
 from apps_panel import AppsPanel
 from gmail_panel import GmailPanel
+from ai_core2 import AICore2
 
 
 class HotReloadManager:
@@ -40,7 +41,7 @@ class HotReloadManager:
             "computer_panel": "computer_panel",
             "settings_panel": "settings_panel",
             "gmail_panel": "gmail_panel",
-            "ai_core": "ai_core",
+            "ai_core2": "ai_core2",
             "left_panel": "left_panel",
         }
 
@@ -191,11 +192,11 @@ class JarvisDisplay(QWidget):
         # AI CORE
         # =========================
 
-        self.ai_core = AICore(self.content_area)
+        self.ai_core2 = AICore2(self.content_area)
 
-        self.ai_core.setGeometry(0, 0, 1000, 800)
+        self.ai_core2.setGeometry(0, 0, 1000, 800)
 
-        self.ai_core.lower()
+        self.ai_core2.lower()
 
         # =========================
         # PANEL USTAWIEŃ
@@ -347,7 +348,7 @@ class JarvisDisplay(QWidget):
         height = self.content_area.height()
 
         # AI CORE
-        self.ai_core.setGeometry(0, 0, width, height)
+        self.ai_core2.setGeometry(0, 0, width, height)
 
         # PRZYCISK WYJŚCIA
         if hasattr(self, "exit_button"):
@@ -519,7 +520,7 @@ class JarvisDisplay(QWidget):
         # UKRYJ WSZYSTKIE MODUŁY
         # =========================
 
-        self.ai_core.hide()
+        self.ai_core2.hide()
         self.settings_panel.hide()
         self.computer_panel.hide()
         self.system_panel.hide()
@@ -548,8 +549,8 @@ class JarvisDisplay(QWidget):
 
         elif identifier == "dashboard":
 
-            self.ai_core.show()
-            self.ai_core.raise_()
+            self.ai_core2.show()
+            self.ai_core2.raise_()
 
         elif identifier == "files":
 
@@ -568,8 +569,8 @@ class JarvisDisplay(QWidget):
 
         else:
 
-            self.ai_core.show()
-            self.ai_core.raise_()
+            self.ai_core2.show()
+            self.ai_core2.raise_()
 
         self.exit_button.raise_()
 
@@ -692,13 +693,13 @@ class JarvisDisplay(QWidget):
         # AI CORE
         # ==========================================
 
-        elif module_name == "ai_core":
+        elif module_name == "ai_core2":
 
-            old_panel = self.ai_core
+            old_panel = self.ai_core2
 
-            new_panel = module.AICore(self.content_area)
+            new_panel = module.AICore2(self.content_area)
 
-            self.ai_core = new_panel
+            self.ai_core2 = new_panel
 
         # ===========================================
         # LEFT PANEL
@@ -782,7 +783,7 @@ class JarvisDisplay(QWidget):
             new_panel.show()
             new_panel.raise_()
 
-        elif current_tab == "dashboard" and module_name == "ai_core":
+        elif current_tab == "dashboard" and module_name == "ai_core2":
             new_panel.show()
             new_panel.raise_()
 
